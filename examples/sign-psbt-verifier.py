@@ -8,17 +8,26 @@ from bitcointx.base58 import Base58Error
 from bitcointx.core.script import CScript, CScriptWitness
 
 from bitcointx.wallet import CCoinKey, CCoinExtKey, CBitcoinAddress, P2WSHBitcoinAddress, CCoinAddress
+
+import os 
+
 select_chain_params('bitcoin/testnet')
 
-TPRV = "tprv8ZgxMBicQKsPfNvyhJ8dmSzj1YMqaa52fxu7tmRNPmw8EhcUyjBr4KuTm6nVnicsDpBVhd9DBrsRvJEa9588423cEEh5faRq8rpig1fcBAb"
+TPRV = os.environ.get("TPRV", "tprv8ZgxMBicQKsPfNvyhJ8dmSzj1YMqaa52fxu7tmRNPmw8EhcUyjBr4KuTm6nVnicsDpBVhd9DBrsRvJEa9588423cEEh5faRq8rpig1fcBAb")
 # xpriv format:
 # xpriv = "xprv9s21ZrQH143K4ZhT2jH8boNjhQwdM432LQz12LzuuoSeT6sPzMr6YaY1qvcqnMEYrNeihXXT2WHdTSgq1rnBExn1hbUn1DhnDm5JEHbgscE"
 
-INPUT_PSBT = "cHNidP8BAH0CAAAAAciw/6GsWeibtjKafG71WhOLT1L58drcunkkqMpmfTa2AAAAAAD/////AtISAAAAAAAAFgAU3RacollkleIxk+lz8my/mLCXiH2IEwAAAAAAACIAID6uagXJMRbXugC2BjPmcmp3A0VXA7vuUXe7D93tXAHsAAAAAAABASsQJwAAAAAAACIAIFOEACIAZIqKBYge/F4OwDI5N1aYtY52gasSzhGASjTsAQVHUSEDpsKKb7ofiMx37vD64ThCvgRV++c9AtRASF15OpQa27UhA8Pni0wHemy313UWoUfiA3lQoVhw86x2wf7zo+8qAL89Uq4iBgOmwopvuh+IzHfu8PrhOEK+BFX75z0C1EBIXXk6lBrbtRw6UrXNMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIgYDw+eLTAd6bLfXdRahR+IDeVChWHDzrHbB/vOj7yoAvz0cx9BkijAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAAAAQFHUSECNqbPQlTIKQoWjsq0rudxAY01fqhxVKW1/qntm67iWF4hA1XsEAHCxPHc4t6UC+rL3LfXdGFAKBqSgwAKpG0lHUYxUq4iAgI2ps9CVMgpChaOyrSu53EBjTV+qHFUpbX+qe2bruJYXhzH0GSKMAAAgAEAAIAAAACAAgAAgAEAAAAAAAAAIgIDVewQAcLE8dzi3pQL6svct9d0YUAoGpKDAAqkbSUdRjEcOlK1zTAAAIABAACAAAAAgAIAAIABAAAAAAAAAAA="
+INPUT_PSBT = os.environ["INPUT_PSBT"]
+LIVE_DANGEROUSLY = bool(os.environ.get("LIVE_DANGEROUSLY", False))
 
+print()
 
-# TODO: make into verbose flag 
-VERBOSE = True
+if LIVE_DANGEROUSLY:
+    print("-"*80)
+    print("WARNING: LIVE_DANGEROUSLY flag is set, some safety checks disabled")
+    print("-"*80)
+
+VERBOSE = bool(os.environ.get("VERBOSE", True))
 
 ###
 
@@ -74,9 +83,13 @@ for idx, output in enumerate(psbt.outputs):
         
     outputs_desc.append(output_desc)
 
+# Currently only supporting TXs with 1-2 outputs (sweep TX OR spend+change TX):
+assert 1 <= len(outputs_desc) <= 2, outputs_desc
+
 # change is optional (sweep) but spend is not:
-assert spend_addr, psbt
-assert output_spend_sats, psbt        
+if not LIVE_DANGEROUSLY:
+    err_msg = "Transaction missing spend address/ammount, are you doing a sweep to yourself? Set LIVE_DANGEROUSLY to ignore this error."
+    assert spend_addr and output_spend_sats, err_msg
 
 if VERBOSE:
     print("PSBT Before Signing:")
@@ -90,7 +103,7 @@ print(
     spend_addr,
     "with a fee of",
     psbt.get_fee(),
-    "(", round(psbt.get_fee() / output_spend_sats * 100, 2), "% )",
+    "(" + round(psbt.get_fee() / output_spend_sats * 100, 2) + "% )" if output_spend_sats else "",
     "with txid",
     b2lx(unsigned_tx.GetTxid()),
     "\n",
@@ -110,17 +123,20 @@ for idx, unsigned_inp in enumerate(unsigned_tx.vin):
         "addr": str(addr_obj),
         "addr_type": addr_obj.__class__.__name__,
         # TODO: confirm amounts only available in PSBT (not unsiged_tx) + that segwit amounts are being signed
-        "amount": psbt_inp.get_amount(unsigned_tx=unsigned_tx),
+        "sats": psbt_inp.get_amount(unsigned_tx=unsigned_tx),
         "witness_script": psbt_inp.witness_script,
     })
 
 if VERBOSE:
+    print("-"*80)
+    print("DETAILED VIEW")
     print(len(inputs_desc), "input(s):")
     for input_desc in inputs_desc:
         print("", input_desc)
     print(len(outputs_desc), "output(s):")
     for output_desc in outputs_desc:
         print("", output_desc)
+    print("-"*80)
 
 ks = KeyStore.from_iterable(
     # xpriv with no mainet selected also works
