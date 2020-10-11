@@ -14,11 +14,15 @@ TPRV = "tprv8ZgxMBicQKsPfNvyhJ8dmSzj1YMqaa52fxu7tmRNPmw8EhcUyjBr4KuTm6nVnicsDpBV
 # xpriv format:
 # xpriv = "xprv9s21ZrQH143K4ZhT2jH8boNjhQwdM432LQz12LzuuoSeT6sPzMr6YaY1qvcqnMEYrNeihXXT2WHdTSgq1rnBExn1hbUn1DhnDm5JEHbgscE"
 
-PSBT_DATA = "cHNidP8BAH0CAAAAAciw/6GsWeibtjKafG71WhOLT1L58drcunkkqMpmfTa2AAAAAAD/////AtISAAAAAAAAFgAU3RacollkleIxk+lz8my/mLCXiH2IEwAAAAAAACIAID6uagXJMRbXugC2BjPmcmp3A0VXA7vuUXe7D93tXAHsAAAAAAABASsQJwAAAAAAACIAIFOEACIAZIqKBYge/F4OwDI5N1aYtY52gasSzhGASjTsAQVHUSEDpsKKb7ofiMx37vD64ThCvgRV++c9AtRASF15OpQa27UhA8Pni0wHemy313UWoUfiA3lQoVhw86x2wf7zo+8qAL89Uq4iBgOmwopvuh+IzHfu8PrhOEK+BFX75z0C1EBIXXk6lBrbtRw6UrXNMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIgYDw+eLTAd6bLfXdRahR+IDeVChWHDzrHbB/vOj7yoAvz0cx9BkijAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAAAAQFHUSECNqbPQlTIKQoWjsq0rudxAY01fqhxVKW1/qntm67iWF4hA1XsEAHCxPHc4t6UC+rL3LfXdGFAKBqSgwAKpG0lHUYxUq4iAgI2ps9CVMgpChaOyrSu53EBjTV+qHFUpbX+qe2bruJYXhzH0GSKMAAAgAEAAIAAAACAAgAAgAEAAAAAAAAAIgIDVewQAcLE8dzi3pQL6svct9d0YUAoGpKDAAqkbSUdRjEcOlK1zTAAAIABAACAAAAAgAIAAIABAAAAAAAAAAA="
+INPUT_PSBT = "cHNidP8BAH0CAAAAAciw/6GsWeibtjKafG71WhOLT1L58drcunkkqMpmfTa2AAAAAAD/////AtISAAAAAAAAFgAU3RacollkleIxk+lz8my/mLCXiH2IEwAAAAAAACIAID6uagXJMRbXugC2BjPmcmp3A0VXA7vuUXe7D93tXAHsAAAAAAABASsQJwAAAAAAACIAIFOEACIAZIqKBYge/F4OwDI5N1aYtY52gasSzhGASjTsAQVHUSEDpsKKb7ofiMx37vD64ThCvgRV++c9AtRASF15OpQa27UhA8Pni0wHemy313UWoUfiA3lQoVhw86x2wf7zo+8qAL89Uq4iBgOmwopvuh+IzHfu8PrhOEK+BFX75z0C1EBIXXk6lBrbtRw6UrXNMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIgYDw+eLTAd6bLfXdRahR+IDeVChWHDzrHbB/vOj7yoAvz0cx9BkijAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAAAAQFHUSECNqbPQlTIKQoWjsq0rudxAY01fqhxVKW1/qntm67iWF4hA1XsEAHCxPHc4t6UC+rL3LfXdGFAKBqSgwAKpG0lHUYxUq4iAgI2ps9CVMgpChaOyrSu53EBjTV+qHFUpbX+qe2bruJYXhzH0GSKMAAAgAEAAIAAAACAAgAAgAEAAAAAAAAAIgIDVewQAcLE8dzi3pQL6svct9d0YUAoGpKDAAqkbSUdRjEcOlK1zTAAAIABAACAAAAAgAIAAIABAAAAAAAAAAA="
+
+
+# TODO: make into verbose flag 
+VERBOSE = True
 
 ###
 
-psbt = PartiallySignedTransaction.from_base64_or_binary(PSBT_DATA)
+psbt = PartiallySignedTransaction.from_base64_or_binary(INPUT_PSBT)
 unsigned_tx = psbt.unsigned_tx
 
 XPRIV_TO_USE = CCoinExtKey(TPRV)
@@ -76,6 +80,10 @@ assert output_spend_sats, psbt
 # INP_AMOUNT = sum([inp.get_amount(self.unsigned_tx) for inp in unsigned_tx.vin])
 # OUT_AMOUNT = sum([outp.nValue for outp in self.unsigned_tx.vout])
 
+if VERBOSE:
+    print("PSBT Before Signing:")
+    print(INPUT_PSBT, "\n")
+
 # TODO: better fee confirmation
 print(
     "Sending",
@@ -87,6 +95,7 @@ print(
     "(", round(psbt.get_fee() / output_spend_sats * 100, 2), "%)",
     "and txid",
     b2lx(unsigned_tx.GetTxid()),
+    "\n",
 )
 
 
@@ -100,11 +109,11 @@ for idx, inp in enumerate(unsigned_tx.vin):
         # "addr": "",  # TODO: possible to get this info?
     })
 
-if True:  # make verbose flag 
-    print("Inputs:")
+if VERBOSE:
+    print(len(inputs_desc), "input(s):")
     for input_desc in inputs_desc:
         print("", input_desc)
-    print("Outputs:")
+    print(len(outputs_desc), "output(s):")
     for output_desc in outputs_desc:
         print("", output_desc)
 
@@ -117,7 +126,8 @@ ks = KeyStore.from_iterable(
 )
 sign_result = psbt.sign(ks, finalize=False)
 
-print("PSBT with added signatures:")
+print("")
+print("PSBT with added signature:")
 print(psbt.to_base64())
 
 # FIXME: add these safety checks:
