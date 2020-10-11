@@ -131,15 +131,25 @@ ks = KeyStore.from_iterable(
 )
 sign_result = psbt.sign(ks, finalize=False)
 
+# Confirm we were able to sign all inputs
+assert sign_result.num_inputs_signed == len(psbt.inputs), psbt
+
+num_missing_sigs_per_input = []
+for index, info in enumerate(sign_result.inputs_info):
+    assert info, psbt
+    # Confirm signing worked (should have added 1 new sig):
+    assert info.num_new_sigs == 1, info
+    num_missing_sigs_per_input.append(info.num_sigs_missing)
+
+assert all(x == num_missing_sigs_per_input[0] for x in num_missing_sigs_per_input), "Different number of sigs needed per input"
+
+
 print("")
 print("PSBT with added signature:")
 print(psbt.to_base64())
 
 # FIXME: add these safety checks:
 if False:
-    print("")
-    print(f'Transaction has total {len(psbt.inputs)} inputs\n')
-    print(f'Added signatures to {sign_result.num_inputs_signed} inputs')
     print(f'{sign_result.num_inputs_final} inputs is finalized')
     if not sign_result.is_final:
         print(f'{sign_result.num_inputs_ready} inputs is ready '
@@ -159,8 +169,6 @@ if False:
                 print(f"Input {index}: skipped, cannot be processed")
 
 
-    import pdb; pdb.set_trace()
-    print()
     if args.finalize:
         if not sign_result.is_final:
             print(f'Failed to finalize transaction')
@@ -168,9 +176,3 @@ if False:
 
         print("Signed network transaction:\n")
         print(b2x(psbt.extract_transaction().serialize()))
-    elif sign_result.num_inputs_signed == 0:
-        print("Could not sign any inputs")
-        sys.exit(-1)
-    else:
-        print("PSBT with added signatures:\n")
-        print(psbt.to_base64())
