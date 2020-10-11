@@ -45,12 +45,13 @@ output_spend_sats = 0
 output_change_sats = 0
 outputs_desc = []
 for idx, output in enumerate(psbt.outputs):
-    address = CCoinAddress.from_scriptPubKey(unsigned_tx.vout[idx].scriptPubKey)
+    addr_obj = CCoinAddress.from_scriptPubKey(unsigned_tx.vout[idx].scriptPubKey)
     output_desc = {
+        # TODO: no way to verify this from psbt itself? seems like a bug:
         "sats": unsigned_tx.vout[idx].nValue,
-        # Use CCoinAddress (instead of CBitcoinAddress) because of testnet
-        "addr": str(address),
-        "addr_type": address.__class__.__name__,
+        # Use CCoinAddress (instead of CBitcoinAddress) because of testnet:
+        "addr": str(addr_obj),
+        "addr_type": addr_obj.__class__.__name__,
         "is_change": False,
     }
     if output.derivation_map:
@@ -77,9 +78,6 @@ for idx, output in enumerate(psbt.outputs):
 assert spend_addr, psbt
 assert output_spend_sats, psbt        
 
-# INP_AMOUNT = sum([inp.get_amount(self.unsigned_tx) for inp in unsigned_tx.vin])
-# OUT_AMOUNT = sum([outp.nValue for outp in self.unsigned_tx.vout])
-
 if VERBOSE:
     print("PSBT Before Signing:")
     print(INPUT_PSBT, "\n")
@@ -92,21 +90,28 @@ print(
     spend_addr,
     "with a fee of",
     psbt.get_fee(),
-    "(", round(psbt.get_fee() / output_spend_sats * 100, 2), "%)",
-    "and txid",
+    "(", round(psbt.get_fee() / output_spend_sats * 100, 2), "% )",
+    "with txid",
     b2lx(unsigned_tx.GetTxid()),
     "\n",
 )
 
 
 inputs_desc = []
-for idx, inp in enumerate(unsigned_tx.vin):
-    # FIXME: ammounts available in PSBT (shouldn't segwit amounts be signed?)
+for idx, unsigned_inp in enumerate(unsigned_tx.vin):
+    psbt_inp = psbt.inputs[idx]
+    addr_obj = CCoinAddress.from_scriptPubKey(psbt_inp.witness_script.to_p2wsh_scriptPubKey())
     inputs_desc.append({
-        "prev_txhash": b2lx(inp.prevout.hash),
-        "prev_idx": inp.prevout.n,
-        "amount": psbt.inputs[idx].get_amount(unsigned_tx=unsigned_tx),
-        # "addr": "",  # TODO: possible to get this info?
+        # From Unsigned TX
+        "prev_txhash": b2lx(unsigned_inp.prevout.hash),
+        "prev_idx": unsigned_inp.prevout.n,
+        "n_sequence": unsigned_inp.nSequence,
+        # From PSBT:
+        "addr": str(addr_obj),
+        "addr_type": addr_obj.__class__.__name__,
+        # TODO: confirm amounts only available in PSBT (not unsiged_tx) + that segwit amounts are being signed
+        "amount": psbt_inp.get_amount(unsigned_tx=unsigned_tx),
+        "witness_script": psbt_inp.witness_script,
     })
 
 if VERBOSE:
