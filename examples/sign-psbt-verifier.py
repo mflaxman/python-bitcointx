@@ -103,7 +103,7 @@ print(
     spend_addr,
     "with a fee of",
     psbt.get_fee(),
-    "(" + round(psbt.get_fee() / output_spend_sats * 100, 2) + "% )" if output_spend_sats else "",
+    "(" + str(round(psbt.get_fee() / output_spend_sats * 100, 2)) + "% )" if output_spend_sats else "",
     "with txid",
     b2lx(unsigned_tx.GetTxid()),
     "\n",
